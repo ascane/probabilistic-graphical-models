@@ -1,4 +1,4 @@
-function [pi, A, mu, sigma, log_lik] = EM(observations, init_dist, A, mu, sigma, n_iters)
+function [pi, A, mu, sigma, loglik, loglik_test] = EM(observations, init_dist, A, mu, sigma, n_iters, test_data)
 % EM algorithm to learn HMM parameters
 %
 % Inputs:
@@ -13,13 +13,15 @@ function [pi, A, mu, sigma, log_lik] = EM(observations, init_dist, A, mu, sigma,
 %   
 
 [T, d] = size(observations);
+
 K = length(A);
 
 pi = init_dist;
 
 smooth_lag_one = zeros(K, K, T-1);
 
-log_lik = zeros(1,n_iters);
+loglik = zeros(1,n_iters);
+loglik_test = zeros(1,n_iters);
 
 for i = 1:n_iters
     % E step: expectation
@@ -30,6 +32,7 @@ for i = 1:n_iters
     log_likelihood_obs = logsumexp(smooth_states(1,:));
     smooth_states = exp(smooth_states - log_likelihood_obs);
     
+    
     for t = 1:T-1
         log_gaussian = log(mvnpdf(repmat(observations(t+1, :), K, 1), mu, sigma));
 %         repmat(log_alpha(t, :), K, 1)
@@ -39,6 +42,16 @@ for i = 1:n_iters
             - log_likelihood_obs;
     end
     smooth_lag_one = exp(smooth_lag_one);
+    
+    loglik(i) = log_likelihood_obs;
+    
+    if nargin == 7
+        log_alpha_test = forward(test_data, pi, A, mu, sigma);
+        log_beta_test = backward(test_data, A, mu, sigma);
+        smooth_states_test = log_alpha_test + log_beta_test;
+        log_likelihood_test = logsumexp(smooth_states_test(1,:));
+        loglik_test(i) = log_likelihood_test;
+    end
     
     
     % M step: maximize complete log-likelihood
@@ -58,7 +71,6 @@ for i = 1:n_iters
         sigma(:,:,k) = sigma_tilde/sum(smooth_states(:, k));
     end
     
-    log_lik(i) = log_likelihood_obs;
     
 end
 
